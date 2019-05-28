@@ -1,0 +1,13 @@
+{
+    "name": "dontsoft/kitchenfun",
+    "require": {
+        "guzzlehttp/guzzle": "^6.3",
+        "vlucas/phpdotenv": "^3.3"
+    },
+    "authors": [
+        {
+            "name": "Artem Dontsov",
+            "email": "artem@dontsoft.com"
+        }
+    ]
+}

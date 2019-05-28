@@ -82,6 +82,41 @@ textarea {
     resize: vertical;
 }
 
+.checkmark input[type="checkbox"] {
+    display: none; }
+  
+.checkmark input[type="checkbox"] + label {
+    display: inline-block;
+    position: relative;
+    cursor: pointer;
+    width: 100%;
+    line-height: 36px;
+    padding-left: 36px; }
+
+.checkmark input[type="checkbox"] + label::before {
+    position: absolute;
+    display: inline-block;
+    content: '';
+    text-align: center;
+    height: 18px;
+    width: 18px;
+    left: 0;
+    top: 9px;
+    border-radius: 5px;
+    border: 1px solid rgba($dark, .6);
+    background-color: transparent;
+    background-position: center;
+    background-size: cover; }
+
+.checkmark input[type="checkbox"] + label:hover::before {
+    border-color: $primary; }
+
+.checkmark input[type="checkbox"]:checked + label::before {
+    border-color: $primary;
+    background-image: url(data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA0OCA0OCI+PHRpdGxlPmNoZWNrbWFyazwvdGl0bGU+PHBhdGggZD0iTTAsMEg0OFY0OEgwWiIgdHJhbnNmb3JtPSJ0cmFuc2xhdGUoMCAwKSIgc3R5bGU9ImZpbGw6bm9uZSIvPjxwYXRoIGQ9Ik0xOCwzMi40LDkuNiwyNCw2LjgsMjYuOCwxOCwzOCw0MiwxNGwtMi44LTIuOFoiIHRyYW5zZm9ybT0idHJhbnNsYXRlKDAgMCkiIHN0eWxlPSJmaWxsOiAjMTQ4MUZBIi8+PC9zdmc+); 
+}
+
+
 .section {
     width: 100vw;
     padding: $height-xs;

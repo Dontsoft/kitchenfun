@@ -72,8 +72,8 @@
               <dontsoft-dropdown v-bind:elements="columns_for_dropdown" @changed="select_food_notes_column"></dontsoft-dropdown>
             </div>
           </div>
-          <div class="row v-center h-center" style="width: 100%" v-if="columns_selected">
-            <span class="btn padding xs" @click="fetch_coords">Weiter</span>
+          <div class="row v-center h-center" style="width: 100%" v-if="columns_selected && current_state < 2">
+            <span class="btn padding xs" @click="fetch_coords" >Weiter</span>
           </div>
         </div>
       </div>
@@ -93,7 +93,7 @@
               <div class="geo-club-distance">{{data.club_distance.toFixed(2)}} km</div>
             </div>
           </div>
-          <div class="row v-center h-center" style="width: 100%" v-if="fetching_index == registrant_data.length">
+          <div class="row v-center h-center" style="width: 100%" v-if="fetching_index == registrant_data.length && current_state < 3">
             <span class="btn padding xs" @click="calculate_pairings">Weiter</span>
           </div>
         </div>
@@ -126,13 +126,13 @@
               </div>
             </div>
           </div>
-          <div class="row v-center h-center" style="width: 100%">
+          <div class="row v-center h-center" style="width: 100%" v-if="current_state < 4">
             <span class="btn padding xs" @click="next_state">Weiter</span>
           </div>
         </div>
       </div>
       <div class="card padding xs column" v-bind:class="current_state >= 4 ? '' : 'disabled'" ref="email-card">
-        <h2>5. E-Mails versenden</h2>
+        <h2>5. E-Mails erstellen</h2>
         <div class="" v-if="current_state >= 4">
           <div class="column">
             <div class="mail-overview-row row" v-for="data in mapped_registrant_data" v-bind:key="data.id">
@@ -145,6 +145,16 @@
             <small>Wenn es mehrere Organisatoren gibt, einfach mit <strong>und</strong> trennen</small>
             <input type="text" id="organizer" v-model="organizer" autocomplete="off">
           </div>
+          <div class="column organizer-column checkmark">
+            <input type="checkbox" id="org-email" v-model="org_email">
+            <label for="org-email">Alle E-Mails an den/die Organisator(en) verschicken</label>
+          </div>
+          <div class="column organizer-column" v-if="org_email">
+            <label for="organizer-1-email">Organisatoren E-Mails (max. 2)</label>
+            <small>{{org_email ? "Beide E-Mails bekommen zur Bestätigung Kopien aller E-Mails zugesandt, diese werden auch als Antwortemails gesetzt." : "Die Organisatoren bekommen keine Kopien der versandten E-Mails. Ihre Adressen werden nur als Antwortemails gesetzt."}}</small>
+            <input type="email" id="organizer-1-email" v-model="organizer_1_email" autocomplete="off">
+            <input type="email" id="organizer-2-email" v-model="organizer_2_email" autocomplete="off">
+          </div>
           <div class="mail-content">
             <textarea id="mail-content-input" ref="mail-content-input" rows=12 v-model="mail_text"></textarea>
           </div>
@@ -155,8 +165,17 @@
             <p v-html="preview_first_team"></p>
             <p>Viele Grüße<br>{{organizer}}</p>
           </div>
-          <div class="row v-center h-center" style="width: 100%">
+          <div class="row v-center h-center" style="width: 100%" v-if="current_state < 5">
             <span class="btn padding xs" @click="send_mails">Senden</span>
+          </div>
+        </div>
+      </div>
+      <div class="card padding xs column" v-bind:class="current_state >= 5 ? '' : 'disabled'" ref="email-sending-card">
+        <h2>E-Mails versenden</h2>
+        <div class="column">
+          <div class="mailing-status row v-center h-center" v-for="state in mail_state" v-bind:key="state.index" v-bind:class="state.success == 1 ? 'success' : (state.success == -1 ? 'error' : '')">
+            <span class="mail">{{state["mail"]}}</span>
+            <span class="state">{{state.success == 1 ? 'Erfolgreich versandt' : (state.success == -1 ? 'Fehler aufgetreten' : 'Sende gerade...')}}</span>
           </div>
         </div>
       </div>
@@ -200,6 +219,18 @@ if (typeof(Number.prototype.toRad) === "undefined") {
   }
 }
 
+if (typeof(Array.prototype.shuffle) === "undefined") {
+  Array.prototype.shuffle = function() {
+    return this.sort(() => Math.random() - 0.5);
+  }
+}
+
+function b64EncodeUnicode(str) {
+    return btoa(encodeURIComponent(str).replace(/%([0-9A-F]{2})/g, function(match, p1) {
+        return String.fromCharCode('0x' + p1);
+    }));
+}
+
 export default {
   data: () => {
     return {
@@ -226,7 +257,11 @@ export default {
       dessert: [],
       course_map: [],
       mail_text: "",
-      organizer: ""
+      organizer: "",
+      organizer_1_email: "",
+      organizer_2_email: "",
+      org_email: true,
+      mail_state: []
     }
   },
   computed: {
@@ -234,14 +269,7 @@ export default {
       return this.mail_text.replace(/\n/g,"<br>")
     },
     preview_first_team: function() {
-      var team_data = this.mapped_registrant_data[0];
-      var data = this.filter_entries(team_data["id"]);
-      console.log(data);
-      var starter_string = this.generate_preview(data, "starter");
-      var main_string = this.generate_preview(data, "main");
-      var dessert_string = this.generate_preview(data, "dessert");
-      return "<strong>Vorspeise</strong><br>" + starter_string + "<br>-----------------------<br>" + "<strong>Hauptspeise</strong><br>" + main_string + "<br>-----------------------<br>" + "<strong>Nachspeise</strong><br>" + dessert_string;
-
+      return this.generate_preview_for_team(0);
     },
     columns_selected: function() {
       return (this.teamname_column != null && this.member_1_column != null && this.member_2_column != null && this.email_column != null && this.addresse_column != null && this.addresse_notes_column != null && this.phone_column != null && this.diet_column != null && this.food_notes_column != null);
@@ -258,21 +286,67 @@ export default {
     }
   },
   methods: {
+    try_email_sending: function(index) {
+      var team_data = this.mapped_registrant_data[index];
+      var data = this.filter_entries(team_data["id"]);
+      var starter_string = this.generate_preview(data, "starter");
+      var main_string = this.generate_preview(data, "main");
+      var dessert_string = this.generate_preview(data, "dessert");
+      var organizer_mails = function(mail1, mail2) {
+        var arr = [];
+        if (mail1.length > 0) {
+          arr.push(mail1);
+        }
+        if (mail2.length > 0) {
+          arr.push(mail2);
+        }
+        return arr;
+      };
+      var mail_data = {
+        "receiver": {
+          "mail": team_data["email"],
+          "name": team_data["name"]
+        },
+        "send_to_organizer": this.org_email && organizer_mails(this.organizer_1_email, this.organizer_2_email).length > 0,
+        "organizer": organizer_mails(this.organizer_1_email, this.organizer_2_email),
+        "title": b64EncodeUnicode("Hallo Team " + team_data["name"]),
+        "pretext": b64EncodeUnicode(this.parsed_mail_text),
+        "starter": b64EncodeUnicode(this.starter_string),
+        "main": b64EncodeUnicode(this.main_string),
+        "dessert": b64EncodeUnicode(this.dessert_string),
+        "endtext": b64EncodeUnicode("Viele Grüße<br>" + this.organizer)
+      }
+
+      var fd = new FormData();
+      fd.append("data", JSON.stringify(mail_data));
+      Axios.post("/mail.php", fd,  { headers: {'Content-Type': 'multipart/form-data' }}).then((r) => {
+        this.mail_state[index].success = 1;
+      }).catch((e) => {
+        console.log(e.request);
+        this.mail_state[index].success = -1;
+      });
+    },
+    generate_preview_for_team: function(index) {
+      var team_data = this.mapped_registrant_data[index];
+      var data = this.filter_entries(team_data["id"]);
+      var starter_string = this.generate_preview(data, "starter");
+      var main_string = this.generate_preview(data, "main");
+      var dessert_string = this.generate_preview(data, "dessert");
+      return "<strong>Vorspeise</strong><br>" + starter_string + "<br>-----------------------<br>" + "<strong>Hauptspeise</strong><br>" + main_string + "<br>-----------------------<br>" + "<strong>Nachspeise</strong><br>" + dessert_string;
+    },
     generate_preview: function(data, key) {
       var _d = data[key];
-      console.log(key);
-      console.log(_d);
       if (_d["host"]) {
         var preview_string = "<strong>Du bist Gastgeber</strong><br><br><em>Deine Gäste:</em><br>";
         preview_string += _d["data"]["guest_1"]["name"] + " (" + _d["data"]["guest_1"]["member_1"] + ", " + _d["data"]["guest_1"]["member_2"] + ")<br>"
-        preview_string += _d["data"]["guest_2"]["name"] + " (" + _d["data"]["guest_2"]["member_1"] + ", " + _d["data"]["guest_2"]["member_2"] + ")<br><br><em>Einschränkungen:</em>";
+        preview_string += _d["data"]["guest_2"]["name"] + " (" + _d["data"]["guest_2"]["member_1"] + ", " + _d["data"]["guest_2"]["member_2"] + ")<br><br><em>Einschränkungen:</em><br>";
         preview_string += _d["data"]["diet"] + "<br><br><em>Anmerkungen:</em>"
         preview_string += _d["data"]["notes"].join("<br>")
         return preview_string;
       }
-      var preview_string = "<em>Gastgeber:</em><br>" + _d["data"]["host"]["name"] + " (" + _d["data"]["host"]["member_1"] + ", " + _d["data"]["host"]["member_2"] + ")<br>" + _d["data"]["addresse"] + "(" + _d["data"]["addresse_notes"] + ")<br>" + _d["data"]["phone"] + "<br><br><em>Gäste:</em>";
+      var preview_string = "<em>Gastgeber:</em><br>" + _d["data"]["host"]["name"] + " (" + _d["data"]["host"]["member_1"] + ", " + _d["data"]["host"]["member_2"] + ")<br>" + _d["data"]["addresse"] + "(" + _d["data"]["addresse_notes"] + ")<br>" + _d["data"]["phone"] + "<br><br><em>Gäste:</em><br>";
       preview_string += _d["data"]["guest_1"]["name"] + " (" + _d["data"]["guest_1"]["member_1"] + ", " + _d["data"]["guest_1"]["member_2"] + ")<br>"
-      preview_string += _d["data"]["guest_2"]["name"] + " (" + _d["data"]["guest_2"]["member_1"] + ", " + _d["data"]["guest_2"]["member_2"] + ")<br><br><em>Einschränkungen:</em>";
+      preview_string += _d["data"]["guest_2"]["name"] + " (" + _d["data"]["guest_2"]["member_1"] + ", " + _d["data"]["guest_2"]["member_2"] + ")<br><br><em>Einschränkungen:</em><br>";
       preview_string += _d["data"]["diet"] + "<br><br><em>Anmerkungen:</em>"
       preview_string += _d["data"]["notes"].join("<br>")
       return preview_string;
@@ -309,12 +383,7 @@ export default {
 
       var _this = this;
       var select = function(_id, type, element, mapped_registrant_data) {
-        var r = {
-          "host": true,
-          "data": null
-        };
         if (element[type]["host"]["id"] == _id || element[type]["guest_1"]["id"] == _id || element[type]["guest_2"]["id"] == _id) {
-          r["host"] = element[type]["host"]["id"] == _id;
           var host = mapped_registrant_data.find((e) => {
             return e["id"] == element[type]["host"]["id"]
           });
@@ -324,53 +393,65 @@ export default {
           var guest_2 = mapped_registrant_data.find((e) => {
             return e["id"] == element[type]["guest_2"]["id"]
           });
-          r["data"] = {
-            "guest_1": {
-              "name": guest_1["name"],
-              "member_1": guest_1["member_1"],
-              "member_2": guest_1["member_2"]
-            },
-            "guest_2": {
-              "name": guest_2["name"],
-              "member_1": guest_2["member_1"],
-              "member_2": guest_2["member_2"]
-            },
-            "host": {
-              "name": host["name"],
-              "member_1": host["member_1"],
-              "member_2": host["member_2"]
-            },
-            "diet": diet_to_string(host["diet"], guest_1["diet"], guest_2["diet"]),
-            "notes" : [host["food_notes"], guest_1["food_notes"], guest_2["food_notes"]],
-            "addresse": host["addresse"],
-            "addresse_notes": host["addresse_notes"],
-            "phone": host["phone"],
-          }
-          return r;
+          return {
+              "host": element[type]["host"]["id"] == _id,
+              "data": {
+              "guest_1": {
+                "name": guest_1["name"],
+                "member_1": guest_1["member_1"],
+                "member_2": guest_1["member_2"]
+              },
+              "guest_2": {
+                "name": guest_2["name"],
+                "member_1": guest_2["member_1"],
+                "member_2": guest_2["member_2"]
+              },
+              "host": {
+                "name": host["name"],
+                "member_1": host["member_1"],
+                "member_2": host["member_2"]
+              },
+              "diet": diet_to_string(host["diet"], guest_1["diet"], guest_2["diet"]),
+              "notes" : [host["food_notes"], guest_1["food_notes"], guest_2["food_notes"]],
+              "addresse": host["addresse"],
+              "addresse_notes": host["addresse_notes"],
+              "phone": host["phone"],
+            }
+          };
         }
         return false;
       }
-
       for (var i = 0; i < this.course_map.length; i++) {
         var e = this.course_map[i];
-        var _s = select(id, "starter", e, this.mapped_registrant_data);
-        if (_s != false) {
-          ret["starter"] = _s;
-        } else {
-          _s = select(id, "main", e, this.mapped_registrant_data);
-          if (_s != false) {
-            ret["main"] = _s;
-          } else {
-            _s = select(id, "main", e, this.mapped_registrant_data);
-            if (_s != false) {
-              ret["dessert"] = _s;
-            }
-          }
+        var _starter = select(id, "starter", e, this.mapped_registrant_data);
+        var _main = select(id, "main", e, this.mapped_registrant_data);
+        var _dessert = select(id, "dessert", e, this.mapped_registrant_data);
+        if (_starter != false) {
+          ret["starter"] = _starter;
+        }
+        if (_main != false) {
+          ret["main"] = _main;
+        }
+        if (_dessert != false) {
+          ret["dessert"] = _dessert;
+        }
+        if (ret["starter"]["data"] != null && ret["main"]["data"] != null && ret["dessert"]["data"] != null) {
+          break;
         }
       }
       return ret;
     },
     send_mails: function() {
+      for (var i = 0; i < this.mapped_registrant_data.length; i++) {
+        this.mail_state.push({
+          "index": i,
+          "mail": this.mapped_registrant_data[i]["email"],
+          "success": 0
+        });
+      }
+      for (var i = 0; i < this.mail_state.length; i++) {
+        this.try_email_sending(i);
+      }
       this.next_state();
     },
     calculate_pairings: function() {
@@ -388,12 +469,17 @@ export default {
       for (var j = 0; j < M; j++) {
         this.starter.push(_geodata[j]);
       }
+
       for (j = 0; j < M; j++) {
         this.main.push(_geodata[M + j]);
       }
+
       for (j = 0; j < M; j++) {
         this.dessert.push(_geodata[2 * M + j]);
       }
+      this.starter.shuffle();
+      this.main.shuffle();
+      this.dessert.shuffle();
 
       var starter_pairings = [];
       var main_pairings = [];
@@ -902,5 +988,30 @@ export default {
 
   .organizer-column, .mail-content, .preview-column {
     margin-top: $height-xs;
+  }
+
+  .mailing-status {
+    padding: $height-xs;
+    margin: $height-xs 0;
+
+    .mail {
+      flex: 1;
+      padding-right: $height-xs;
+    }
+    &.success {
+      background-color: $success;
+      color: $light;
+      * {
+        color: $light
+      }
+    }
+
+    &.error {
+      background-color: $error;
+      color: $light;
+      * {
+        color: $light;
+      }
+    }
   }
 </style>

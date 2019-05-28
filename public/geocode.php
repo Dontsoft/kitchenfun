@@ -4,21 +4,21 @@ require_once __DIR__ . '/../config.php';
 header('Content-Type: application/json');
 
 if (!defined('API_KEY') || strlen(API_KEY) <= 0) {
-    echo json_encode((object)["message" => "API key missing"]);
     http_response_code(500);
+    echo json_encode((object)["message" => "API key missing"]);
     exit(500);
 }
 
 if (!isset($_POST["addresse"])) {
-    echo json_encode((object)["message" => "Bad request"]);
     http_response_code(400);
+    echo json_encode((object)["message" => "Bad request"]);
     exit(400);
 }
 
 $addresse = $_POST['addresse'];
 if (!is_string($addresse) || strlen($addresse) <= 0) {
-    echo json_encode((object)["message" => "Invalid data"]);
     http_response_code(400);
+    echo json_encode((object)["message" => "Invalid data"]);
     exit(400);
 }
 
